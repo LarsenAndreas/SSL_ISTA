@@ -10,6 +10,14 @@ Created using Python 3.10.6. See requirements.txt for further details.
 ### Usage:
 The script is designed such that variables are changed directly in the code. The `training.py` script builds and executes the training loop -- Just provide a list image paths.
 
-### Credits:
+### Credit:
 Inspired by the original PyTorch implementation ["ISTA-Net-PyTorch"](https://github.com/jianzhangcs/ISTA-Net-PyTorch) by [Jian Zhang](https://github.com/jianzhangcs).
 
+```
+@mastersthesis{jonhardsson2023,
+    author       = {Jónhardsson, Magnus and Jørgensen, Mads and Larsen, Andreas},
+    school       = {Aalborg University},
+    title        = {Combining Algorithm Unrolling with Self-Supervised Learning for Compressed Sensing Image Super-Resolution},
+    year         = {2023}
+}
+```
