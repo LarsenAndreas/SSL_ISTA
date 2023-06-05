@@ -8,16 +8,11 @@ The implementation of ISTA-Net and MAE (with ViT) is based on the paper ["ISTA-N
 
 Created using Python 3.10.6. See requirements.txt for further details.
 
+## Usage
 
-### Requirements
+### ISTA-Net and ista2vec
 
-Created using Python 3.10.6. See requirements.txt for further details.
-
-### Usage
-
-### ISTA-Net
-
-The script is designed such that variables are changed directly in the code. The `training.py` script builds and executes the training loop -- Just provide a list image paths.
+The script is designed such that variables are changed directly in the code. The `training.py` script builds and executes the training loop -- Just provide a list image paths. 
 
 ### ISTA-MAE and MAE
 
@@ -28,7 +23,7 @@ The script is designed such that parameters are set in a parameter file, `parame
 - `train_sr_istamae.py`
 - `train_sr_mae.py`
 
-### Credit
+## Credit
 
 Inspired by the original PyTorch implementation ["ISTA-Net-PyTorch"](https://github.com/jianzhangcs/ISTA-Net-PyTorch) by [Jian Zhang](https://github.com/jianzhangcs) and ["Masked Autoencoders: A PyTorch Implementation"](https://github.com/facebookresearch/mae) by [Xinlei Chen](https://github.com/endernewton) and [Kaiming He](https://github.com/KaimingHe).
 
