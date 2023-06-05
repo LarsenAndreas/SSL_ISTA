@@ -96,13 +96,13 @@ class TrainISTANet:
         self.phi = self.phi.to(device)
         self.model = self.model.to(device)
 
-    def start(self, epochs, learning_rate, batch_size, weight_discrepency: float = 1.0, weight_constraint: float = 0.01):
-        """_summary_
+    def start(self, epochs: int, learning_rate: float, batch_size: int, weight_discrepency: float = 1.0, weight_constraint: float = 0.01):
+        """Start the training
 
         Args:
-            `epochs` (_type_): Number of epochs to run.
-            `learning_rate` (_type_): Learning rate.
-            `batch_size` (_type_): Size of the minibatches.
+            `epochs` (int): Number of epochs to run.
+            `learning_rate` (float): Learning rate.
+            `batch_size` (int): Size of the minibatches.
             `weight_discrepency` (float, optional): How much to weight the MSE loss (L_D). Defaults to 1.0.
             `weight_constraint` (float, optional): How much to weight the inverse morphism loss (L_IM). Defaults to 0.01.
         """
@@ -159,6 +159,7 @@ class TrainISTA2vec:
         self.path_images = path_images
         self.crop_size = crop_size
         self.dataset = ImageData(path_images, crop_size=crop_size)
+        self.rng = np.random.default_rng()
 
         phi = getDSMatrix(res_init=crop_size, ds_factor=ds_factor)
         self.phi = torch.tensor(phi).float()
@@ -184,15 +185,17 @@ class TrainISTA2vec:
         self.device = device
         self.phi = self.phi.to(device)
         self.model_student = self.model_student.to(device)
+        self.model_teacher = self.model_teacher.to(device)
 
-    def start(self, epochs, learning_rate, batch_size, weight_discrepency: float = 1.0, weight_constraint: float = 0.01):
-        """_summary_
+    def start(self, epochs: int, learning_rate: float, batch_size: int, mask_size: int, tau: tuple, weight_constraint: float = 0.01):
+        """Start the training
 
         Args:
-            `epochs` (_type_): Number of epochs to run.
-            `learning_rate` (_type_): Learning rate.
-            `batch_size` (_type_): Size of the minibatches.
-            `weight_discrepency` (float, optional): How much to weight the MSE loss (L_D). Defaults to 1.0.
+            `epochs` (int): Number of epochs to run.
+            `learning_rate` (float): Learning rate.
+            `batch_size` (int): Size of the minibatches.
+            `mask_size` (int): Size of the mask.
+            `tau` (tuple): Annealing of weight sharing. Linearly anneals between tau[0] and tau[1].
             `weight_constraint` (float, optional): How much to weight the inverse morphism loss (L_IM). Defaults to 0.01.
         """
         optimiser = torch.optim.Adam(params=self.model_student.parameters(), lr=learning_rate)
@@ -203,7 +206,8 @@ class TrainISTA2vec:
         pbar_epochs = tqdm(total=epochs, desc="Epoch")
         pbar_batch = tqdm(total=len(dataloader), leave=True, desc="Batch")
 
-        for _ in range(epochs):
+        self.tau = torch.linspace(tau[0], tau[1], steps=epochs, requires_grad=False).to(device)
+        for e in range(epochs):
             loss_sum = 0
             for X_HR in dataloader:
                 optimiser.zero_grad()
@@ -211,15 +215,21 @@ class TrainISTA2vec:
                 X_HR = X_HR.to(self.device).flatten(-2)
                 Y = linear(X_HR, self.phi, bias=None)
                 B = linear(Y, self.phi.T, bias=None)
+                with torch.no_grad():
+                    X_SR_T, _ = self.model_teacher(Y, self.A, B, self.Qinit)
+                    mask = torch.zeros(size=(*X_SR_T.shape[:-1], self.crop_size, self.crop_size), dtype=torch.bool)
+                    for m, idx in zip(mask, self.rng.integers(low=0, high=self.crop_size - mask_size, size=mask.shape[0], endpoint=True)):
+                        m[..., idx : idx + mask_size, idx : idx + mask_size] = True
+                    mask = mask.flatten(-2)
 
-                X_SR, error_symmetry = self.model_student(Y, self.A, B, self.Qinit)
+                X_SR_S, error_symmetry = self.model_student(Y, self.A, B, self.Qinit)
 
-                loss_discrepancy = mse_loss(X_SR, X_HR)
+                loss_discrepancy = mse_loss(X_SR_T, X_SR_S)
                 loss_constraint = torch.mean(error_symmetry[0] ** 2)
                 for i in range(1, self.model_student.T):
                     loss_constraint += torch.mean((error_symmetry[i] ** 2))
 
-                loss_batch = weight_discrepency * loss_discrepancy + 1 / self.model_student.T * weight_constraint * loss_constraint
+                loss_batch = loss_discrepancy + 1 / self.model_student.T * weight_constraint * loss_constraint
 
                 loss_sum += loss_batch.item()
                 loss_batch.backward()
@@ -232,9 +242,21 @@ class TrainISTA2vec:
             pbar_epochs.update()
             pbar_batch.reset()
 
+            scheduler.step()
+
+            with torch.no_grad():
+                states_teacher = deepcopy(self.model_teacher.state_dict())
+                states_student = deepcopy(self.model_student.state_dict())
+                for parameter, weight_s in states_student.items():
+                    weight_t = states_teacher[parameter]
+                    weight_t = tau[e] * weight_t + (1 - tau[e]) * weight_s
+                    states_teacher[parameter] = weight_t
+
+                self.model_teacher.load_state_dict(states_teacher)
+
         pbar_epochs.close()
         pbar_batch.close()
-        torch.save(self.model_student.state_dict(), f"ISTANet_e{epochs}.pth")
+        torch.save(self.model_student.state_dict(), f"ista2vec_e{epochs}.pth")
 
 
 if __name__ == "__main__":
