@@ -35,12 +35,13 @@ class ISTANet(nn.Module):
             xavier_normal_(self.B1[i].weight)
             xavier_normal_(self.B2[i].weight)
 
-    def forward(self, Y: torch.Tensor, A: torch.Tensor, B: torch.Tensor, Qinit: torch.Tensor):
+    def forward(self, Y: torch.Tensor, A: torch.Tensor, B: torch.Tensor, Qinit: torch.Tensor, mask: torch.Tensor = None):
         """
         Args:
             `Y` (torch.Tensor): Low-resolution input. (batch, channel, hight x width)
             `A` (torch.Tensor): Φ†Φ, where Φ is the downsampling matrix.
             `B` (torch.Tensor): Φ†Y, where Y is a batch of flattened low-resolution input images.
+            `mask` (torch.Tensor, optional): Boolen mask. Defaults to `None`
         """
 
         x = linear(Y, Qinit, bias=None)  # Performs downsampling on the entire batch
